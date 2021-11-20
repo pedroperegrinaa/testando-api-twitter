@@ -1,28 +1,54 @@
-var Twit = require("twit");
+const needle = require("needle");
+const express = require("express");
 
-require("dotenv").config();
-const nossoBot = new Twit({
-    consumer_key: process.env.CONSUMER_KEY,
-    consumer_secret: process.env.CONSUMER_SECRET,
-    access_token: process.env.ACCESS_TOKEN,
-    access_token_secret: process.env.ACCESS_TOKEN_SECRET,
-    timeout_ms: 60 * 1000
-});
+const id = "1034710670829400064";
+const likedTweetsendpointURL = `https://api.twitter.com/2/users/${id}/liked_tweets`;
+const token = process.env.BEARER_TOKEN;
 
-function acaoDoNossoBot() {
-    // Cuidado ao postar tweets repetidos
-    var postTweet = "Esta será a frase de nosso post";
+function twitterRoute() {
+    const tweets = new express.Router();
 
-    nossoBot.post(
-        'statuses/update', { status: postTweet },
-        function(err, data, response) {
-            if (err) {
-                console.log("ERRO:" + err);
-                return false;
+    // GET REST endpoint - query params may or may not be populated
+    tweets.get("/", function(req, res) {
+        console.log(new Date(), "In twitter route GET / req.query=", req.query);
+
+        (async() => {
+            try {
+                // Make request
+                const response = await getLikedTweets();
+
+                //return result
+                console.log("Tweet likes data received");
+                res.json({ response });
+            } catch (e) {
+                console.log(e);
             }
-            console.log("Tweet postado com sucesso!\n");
+        })();
+    });
+
+    async function getLikedTweets() {
+        // The default parameters - only the Tweet ID and text are returned
+        const params = {
+            "tweet.fields": "lang,author_id",
+            "user.fields": "created_at",
+        };
+
+        // this is the HTTP header that adds bearer token authentication
+        const res = await needle("get", likedTweetsendpointURL, params, {
+            headers: {
+                "User-Agent": "LikedTweetsTestCode",
+                authorization: `Bearer ${token}`,
+            },
+        });
+
+        if (res.body) {
+            return res.body;
+        } else {
+            throw new Error("Unsuccessful request");
         }
-    )
+    }
+
+    return tweets;
 }
-acaoDoNossoBot();
-setInterval(acaoDoNossoBot, 43200000 / 3);
+
+module.exports = twitterRoute;
